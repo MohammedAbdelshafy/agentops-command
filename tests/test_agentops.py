@@ -249,11 +249,12 @@ def test_bad_meta_format_errors():
     assert "k=v" in r.stderr, r.stderr
 
 
-for name, fn in sorted(
-    [(k, v) for k, v in list(globals().items()) if k.startswith("test_") and callable(v)]
-):
-    check(name, fn)
+if __name__ == "__main__":
+    for name, fn in sorted(
+        [(k, v) for k, v in list(globals().items()) if k.startswith("test_") and callable(v)]
+    ):
+        check(name, fn)
 
-print("\n".join(results))
-print(f"\n{passed} passed, {len(results) - passed} failed/errors out of {len(results)}")
-sys.exit(0 if passed == len(results) else 1)
+    print("\n".join(results))
+    print(f"\n{passed} passed, {len(results) - passed} failed/errors out of {len(results)}")
+    sys.exit(0 if passed == len(results) else 1)
