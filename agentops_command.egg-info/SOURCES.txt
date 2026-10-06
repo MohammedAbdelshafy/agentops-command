@@ -1,0 +1,10 @@
+LICENSE
+README.md
+agentops.py
+pyproject.toml
+agentops_command.egg-info/PKG-INFO
+agentops_command.egg-info/SOURCES.txt
+agentops_command.egg-info/dependency_links.txt
+agentops_command.egg-info/entry_points.txt
+agentops_command.egg-info/top_level.txt
+tests/test_agentops.py
