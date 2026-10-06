@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentops-command"
-version = "0.1.0"
+version = "0.1.1"
 description = "Track agent runs on a local JSON store: register runs, append timestamped logs, set run states, record token usage and cost, produce rollup reports. Standard library only."
 readme = "README.md"
 license = { text = "MIT" }

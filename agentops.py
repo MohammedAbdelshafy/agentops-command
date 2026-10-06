@@ -21,7 +21,7 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 VALID_STATES = ("running", "succeeded", "failed")
 VALID_LEVELS = ("info", "warn", "error")
 
@@ -43,7 +43,18 @@ def load_store(path):
         return {}
     if not isinstance(data, dict):
         raise ValueError(f"store at {path} is corrupt: expected a JSON object")
+    for key, value in data.items():
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"store at {path} is corrupt: entry {key!r} is not an object"
+            )
     return data
+
+
+def check_run_id(run_id):
+    """Reject empty or whitespace-only run ids with a clear error."""
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise ValueError("run id must be a non-empty string")
 
 
 def save_store(path, data):
@@ -84,6 +95,7 @@ def parse_meta(pairs):
 
 
 def cmd_register(args):
+    check_run_id(args.run_id)
     store = load_store(args.store)
     if args.run_id in store:
         raise ValueError(f"run already exists: {args.run_id}")
@@ -105,6 +117,7 @@ def cmd_register(args):
 
 
 def cmd_log(args):
+    check_run_id(args.run_id)
     store = load_store(args.store)
     run = require_run(store, args.run_id)
     run["logs"].append(
@@ -116,6 +129,7 @@ def cmd_log(args):
 
 
 def cmd_status(args):
+    check_run_id(args.run_id)
     store = load_store(args.store)
     run = require_run(store, args.run_id)
     if args.state is not None:
@@ -125,7 +139,6 @@ def cmd_status(args):
         elif args.state == "running":
             run["ended_at"] = None
         save_store(args.store, store)
-    run = require_run(store, args.run_id)
     print(f"run:      {run['run_id']}")
     print(f"agent:    {run['agent'] or '-'}")
     print(f"state:    {run['state']}")
@@ -141,6 +154,7 @@ def cmd_status(args):
 
 
 def cmd_cost(args):
+    check_run_id(args.run_id)
     store = load_store(args.store)
     run = require_run(store, args.run_id)
     run["tokens_in"] = args.tokens_in
@@ -220,12 +234,22 @@ def cmd_report(args):
     else:
         text = report_markdown(rep)
     if args.out:
+        parent = os.path.dirname(os.path.abspath(args.out))
+        os.makedirs(parent, exist_ok=True)
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text)
         print(f"wrote report to {args.out}")
     else:
         sys.stdout.write(text)
     return 0
+
+
+def col(text, width):
+    """Format a table cell: pad to width, truncate with '...' if too long."""
+    text = str(text)
+    if len(text) > width:
+        text = text[: width - 3] + "..."
+    return f"{text:<{width}}"
 
 
 def cmd_list(args):
@@ -235,8 +259,8 @@ def cmd_list(args):
     for run_id in sorted(store):
         run = store[run_id]
         print(
-            f"{run_id:<24} {str(run.get('agent') or '-'): <16} "
-            f"{run.get('state', '-'): <10} "
+            f"{col(run_id, 24)} {col(str(run.get('agent') or '-'), 16)} "
+            f"{col(str(run.get('state') or '-'), 10)} "
             f"{int(run.get('tokens_in', 0) or 0):>10} "
             f"{int(run.get('tokens_out', 0) or 0):>11} "
             f"{float(run.get('cost_usd', 0.0) or 0.0):>10.6f}"
@@ -262,6 +286,19 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog="agentops",
         description="Ops CLI for agent runs: register, log, status, cost tracking, and rollup reports.",
+        epilog=(
+            "examples:\n"
+            '  agentops register demo-run --agent batch-scorer --meta dataset=leads.csv\n'
+            '  agentops log demo-run "batch finished" --level info\n'
+            "  agentops status demo-run --state succeeded\n"
+            "  agentops cost demo-run --tokens-in 12000 --tokens-out 3000 --cost-usd 0.045\n"
+            "  agentops report --format json --out report.json\n"
+            "  agentops list\n"
+            "\n"
+            "The store defaults to ./.agentops/store.json; override with --store\n"
+            "or the AGENTOPS_STORE environment variable."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--store", default=None, help="path to the JSON store")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
@@ -309,9 +346,14 @@ def main(argv=None):
         args.store = default_store_path()
     try:
         return args.func(args)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
+        # Expected failures (bad input, unknown run, corrupt store, I/O
+        # errors) get a one-line message on stderr, never a traceback.
         print(f"agentops: error: {exc}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("agentops: interrupted", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

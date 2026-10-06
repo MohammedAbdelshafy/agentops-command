@@ -249,6 +249,159 @@ def test_bad_meta_format_errors():
     assert "k=v" in r.stderr, r.stderr
 
 
+def test_empty_run_id_rejected():
+    tmp, store = fresh()
+    r = run(["register", ""], store, tmp)
+    assert r.returncode != 0
+    assert "non-empty" in r.stderr, r.stderr
+    for args in (
+        ["log", "", "msg"],
+        ["status", ""],
+        ["cost", "", "--tokens-in", "1", "--tokens-out", "1"],
+    ):
+        r = run(args, store, tmp)
+        assert r.returncode != 0, args
+        assert "non-empty" in r.stderr, (args, r.stderr)
+    # nothing was written to the store
+    assert not os.path.exists(store)
+
+
+def test_whitespace_run_id_rejected():
+    tmp, store = fresh()
+    r = run(["register", "   "], store, tmp)
+    assert r.returncode != 0
+    assert "non-empty" in r.stderr, r.stderr
+
+
+def test_corrupt_store_top_level_errors():
+    tmp, store = fresh()
+    with open(store, "w", encoding="utf-8") as fh:
+        fh.write("[1, 2, 3]")
+    r = run(["list"], store, tmp)
+    assert r.returncode != 0
+    assert "corrupt" in r.stderr, r.stderr
+    assert "Traceback" not in r.stderr, r.stderr
+
+
+def test_corrupt_store_entry_errors():
+    tmp, store = fresh()
+    with open(store, "w", encoding="utf-8") as fh:
+        json.dump({"r1": "not-an-object"}, fh)
+    r = run(["list"], store, tmp)
+    assert r.returncode != 0
+    assert "corrupt" in r.stderr, r.stderr
+    assert "Traceback" not in r.stderr, r.stderr
+    r = run(["report", "--format", "json"], store, tmp)
+    assert r.returncode != 0
+    assert "Traceback" not in r.stderr, r.stderr
+
+
+def test_malformed_json_store_errors_cleanly():
+    tmp, store = fresh()
+    with open(store, "w", encoding="utf-8") as fh:
+        fh.write("{not valid json")
+    r = run(["list"], store, tmp)
+    assert r.returncode != 0
+    assert "Traceback" not in r.stderr, r.stderr
+    assert "agentops: error:" in r.stderr, r.stderr
+
+
+def test_store_path_is_directory_errors_cleanly():
+    tmp, store = fresh()
+    os.makedirs(store)
+    r = run(["list"], store, tmp)
+    assert r.returncode != 0
+    assert "Traceback" not in r.stderr, r.stderr
+    assert "agentops: error:" in r.stderr, r.stderr
+
+
+def test_report_out_creates_parent_dirs():
+    tmp, store = fresh()
+    run(["register", "p1"], store, tmp)
+    out = os.path.join(tmp, "nested", "deep", "report.md")
+    r = run(["report", "--out", out], store, tmp)
+    assert r.returncode == 0, r.stderr
+    with open(out, "r", encoding="utf-8") as fh:
+        assert "# AgentOps Report" in fh.read()
+
+
+def test_list_truncates_long_ids():
+    tmp, store = fresh()
+    long_id = "r-" + "x" * 60
+    long_agent = "agent-" + "y" * 40
+    r = run(["register", long_id, "--agent", long_agent], store, tmp)
+    assert r.returncode == 0, r.stderr
+    r = run(["list"], store, tmp)
+    assert r.returncode == 0, r.stderr
+    assert "..." in r.stdout, r.stdout
+    assert long_id not in r.stdout, "full 62-char id should be truncated"
+    assert long_agent not in r.stdout, "full agent name should be truncated"
+    for line in r.stdout.splitlines():
+        assert len(line) <= 24 + 1 + 16 + 1 + 10 + 1 + 10 + 1 + 11 + 1 + 10, line
+
+
+def test_negative_tokens_rejected():
+    tmp, store = fresh()
+    run(["register", "n1"], store, tmp)
+    r = run(["cost", "n1", "--tokens-in", "-1", "--tokens-out", "0"], store, tmp)
+    assert r.returncode != 0
+    assert "must be >= 0" in r.stderr, r.stderr
+    r = run(["cost", "n1", "--tokens-in", "0", "--tokens-out", "0", "--cost-usd", "-0.5"], store, tmp)
+    assert r.returncode != 0
+    assert "must be >= 0" in r.stderr, r.stderr
+
+
+def test_noninteger_tokens_rejected():
+    tmp, store = fresh()
+    run(["register", "n2"], store, tmp)
+    r = run(["cost", "n2", "--tokens-in", "abc", "--tokens-out", "0"], store, tmp)
+    assert r.returncode != 0
+    assert "Traceback" not in r.stderr, r.stderr
+
+
+def test_bad_level_choice_rejected():
+    tmp, store = fresh()
+    run(["register", "n3"], store, tmp)
+    r = run(["log", "n3", "msg", "--level", "bogus"], store, tmp)
+    assert r.returncode != 0
+    assert "Traceback" not in r.stderr, r.stderr
+
+
+def test_help_shows_examples():
+    r = subprocess.run(
+        [sys.executable, CLI, "--help"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "examples" in r.stdout.lower(), r.stdout
+    assert "agentops register" in r.stdout, r.stdout
+
+
+def test_version_flag():
+    r = subprocess.run(
+        [sys.executable, CLI, "--version"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "agentops" in r.stdout, r.stdout
+
+
+def test_status_running_clears_ended_at():
+    tmp, store = fresh()
+    run(["register", "e1"], store, tmp)
+    run(["status", "e1", "--state", "succeeded"], store, tmp)
+    data = read_store(store)
+    assert data["e1"]["ended_at"], "ended_at should be set after succeeded"
+    run(["status", "e1", "--state", "running"], store, tmp)
+    data = read_store(store)
+    assert data["e1"]["state"] == "running"
+    assert data["e1"]["ended_at"] is None, "ended_at should be cleared when back to running"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(
         [(k, v) for k, v in list(globals().items()) if k.startswith("test_") and callable(v)]

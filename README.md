@@ -6,10 +6,14 @@ usage and cost, and produce rollup reports.
 
 ## Install
 
-Requires Python 3.8+ and nothing else. Copy `agentops.py` anywhere on your
-PATH, or run it directly:
+Requires Python 3.9+ and nothing else. Install from the repo to get the
+`agentops` command, or run `agentops.py` directly:
 
 ```sh
+pip install .
+agentops --help
+
+# or, without installing:
 python3 agentops.py --help
 ```
 
@@ -78,11 +82,14 @@ python3 agentops.py report
 | `log <run-id> <message> [--level info\|warn\|error]` | Append a timestamped log entry. Errors if the run id is unknown. |
 | `status <run-id> [--state running\|succeeded\|failed]` | Print the run. Setting a state updates it; `succeeded`/`failed` record `ended_at`, `running` clears it. |
 | `cost <run-id> --tokens-in N --tokens-out M [--cost-usd X]` | Record token counts and optional USD cost on the run. |
-| `report [--format md\|json] [--out FILE]` | Rollup across all runs: totals, counts by state, token/cost totals, and a failure list (failed runs with their last error log line, falling back to the last log line). |
-| `list` | One-line-per-run table. |
+| `report [--format md\|json] [--out FILE]` | Rollup across all runs: totals, counts by state, token/cost totals, and a failure list (failed runs with their last error log line, falling back to the last log line). `--out` creates missing parent directories. |
+| `list` | One-line-per-run table. Long run ids and agent names are truncated with `...` to keep columns aligned. |
 
-Exit code is non-zero with a message on stderr for errors (duplicate
-register, unknown run id, malformed `k=v` metadata).
+Exit code is non-zero with a one-line message on stderr for errors — never a
+traceback. Errors include: duplicate register, unknown run id, empty run id,
+malformed `k=v` metadata, negative token/cost values, a missing or corrupt
+store file (bad JSON, top-level non-object, or non-object run entries), and
+unreadable/unwritable paths.
 
 ## Tests
 
@@ -92,9 +99,13 @@ python3 tests/test_agentops.py
 
 The suite runs the real CLI end to end in temp directories and covers:
 register/log/status/cost round-trips, duplicate-register and
-unknown-run errors, report math across runs, failure listing, report-to-file,
-`list` output, the `AGENTOPS_STORE` override, and store validity after every
-operation. 12 tests, all passing.
+unknown-run errors, empty/whitespace run-id rejection, report math across
+runs, failure listing, report-to-file (including parent-dir creation),
+`list` output and long-id truncation, the `AGENTOPS_STORE` override, corrupt
+and malformed stores failing cleanly (no tracebacks), `--store` pointing at a
+directory, negative/non-integer token rejection, bad `--level`/`--state`
+choices, `--help` examples, `--version`, `ended_at` set/clear semantics, and
+store validity after every operation. 26 tests, all passing.
 
 ## Limits
 
