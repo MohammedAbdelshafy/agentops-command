@@ -1,0 +1,33 @@
+name: 'AgentOps Command'
+description: 'Report on agent runs in CI: track runs on a local JSON store, record token usage and cost, and produce rollup reports. Standard library only.'
+author: 'Mohammed Abdelshafy'
+branding:
+  icon: 'activity'
+  color: 'purple'
+inputs:
+  store:
+    description: 'Path to the agentops JSON store, relative to your repo root'
+    required: true
+  format:
+    description: 'Report format: md or json'
+    required: false
+    default: 'md'
+  out:
+    description: 'Write the report to this file (relative to your repo root) instead of stdout'
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout AgentOps Command
+      uses: actions/checkout@v4
+      with:
+        repository: MohammedAbdelshafy/agentops-command
+        path: _agentops_command
+    - name: Produce rollup report
+      shell: bash
+      run: |
+        cd _agentops_command
+        args="--store \"${{ github.workspace }}/${{ inputs.store }}\" report --format \"${{ inputs.format }}\""
+        if [ -n "${{ inputs.out }}" ]; then args="$args --out \"${{ github.workspace }}/${{ inputs.out }}\""; fi
+        python3 -m agentops $args
