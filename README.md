@@ -2,7 +2,7 @@
 
 A small Python command-line tool for recording automated task runs, their logs, outcomes and usage costs in a local JSON file. It can show one run or summarize a batch. The installed command and package keep their current technical names.
 
-The approved product name is **AgentOps**. The repository and command identifiers remain unchanged. The repository and command identifiers remain unchanged.
+Record automated task runs, add timestamped logs and usage costs, and produce a summary from local JSON records.
 
 ## Install
 
@@ -56,7 +56,7 @@ python3 agentops.py list
 
 # Rollup report (markdown to stdout, or JSON with --format json; --out FILE to write to a file)
 python3 agentops.py report
-# # AgentOps Report
+## AgentOps report
 #
 # Total runs: 1
 #
