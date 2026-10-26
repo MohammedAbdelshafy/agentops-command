@@ -2,11 +2,11 @@
 type: repository
 status: active
 owner_repo: MohammedAbdelshafy/agentops-command
-product_name: Workflow Checks
+product_name: AgentOps
 source_of_truth: https://github.com/MohammedAbdelshafy/agentops-command
 ---
 
-# Workflow Checks CONTEXT
+# AgentOps CONTEXT
 
 One job: keep a simple record of automated task runs and show which completed, failed or needs attention.
 
