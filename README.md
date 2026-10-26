@@ -1,8 +1,8 @@
-# Workflow Checks
+# AgentOps
 
 A small Python command-line tool for recording automated task runs, their logs, outcomes and usage costs in a local JSON file. It can show one run or summarize a batch. The installed command and package keep their current technical names.
 
-The customer-facing name for this project is **Workflow Checks**. The repository and command identifiers remain unchanged.
+The approved product name is **AgentOps**. The repository and command identifiers remain unchanged. The repository and command identifiers remain unchanged.
 
 ## Install
 
