@@ -1,8 +1,8 @@
-# AgentOps Command
+# Workflow Checks
 
-A Python CLI (standard library only) for tracking agent runs on a local JSON
-store: register runs, append timestamped logs, set run states, record token
-usage and cost, and produce rollup reports.
+A small Python command-line tool for recording automated task runs, their logs, outcomes and usage costs in a local JSON file. It can show one run or summarize a batch. The installed command and package keep their current technical names.
+
+The customer-facing name for this project is **Workflow Checks**. The repository and command identifiers remain unchanged.
 
 ## Install
 
